@@ -1,0 +1,164 @@
+#include <LiquidCrystal_I2C.h>
+#include <Wire.h>
+
+LiquidCrystal_I2C lcd(0x27,16,2);  // set the LCD address to 0x27 for a 16 chars and 2 line display. ACHTUNG: Adresse kann auch 0x3F sein !!!
+
+// Anschlüsse:
+// GND - GND
+// VCC - 5V
+// SDA - ANALOG Pin 4
+// SCL - ANALOG pin 5
+
+long time_start, time_end;
+int value_light_barrier_1, value_light_barrier_2;
+float distance;
+float velocity;
+float mass_oil, mass_sphere;
+float radius_sphere;
+float density_oil;
+float viscosity;
+float volume_oil;
+
+int sensorValue;
+
+const float g = 9.81;
+const float Pi = 3.141592654;
+
+const int buttonPin = 12;
+int PotiPin = A0;
+int light_barrier_1 = A1;
+int light_barrier_2 = A2;
+
+
+
+// ===========================
+// =======   SETUP   =========
+// ===========================
+
+void setup()
+   {
+    Serial.begin(9600);
+    
+    lcd.begin();        // initialize the lcd
+    lcd.backlight();
+    lcd.setCursor(0,0);
+    lcd.print("Kugelfall-");
+    lcd.setCursor(0,1);
+    lcd.print("Viskosimeter");
+    
+    delay(3000);
+    
+    lcd.setCursor(0,0);
+    lcd.print("             ");
+    lcd.setCursor(0,1);
+    lcd.print("            ");
+
+    volume_oil = 50.0;  // volume in cm³ of the liquid which viscosity you want to calculate
+
+    radius_sphere = 0.485;  // radius of the metal-sphere in cm
+
+    mass_sphere = 0.81;   // mass of the metal-sphere in gram
+
+    distance = 6.0;      // distance of the two light-barriers in cm
+
+    pinMode(buttonPin, INPUT);
+
+    delay(10);
+    
+    value_light_barrier_1 = analogRead(light_barrier_1);    // reads the input-voltage of the lightbarrier 1 without sphere
+
+    delay(10);
+    
+    value_light_barrier_2 = analogRead(light_barrier_2);    // reads the input-voltage of the lightbarrier 2 without sphere    
+
+    Serial.print("Wert Lichtschranke 1 = ");
+    Serial.print(value_light_barrier_1);
+    
+    Serial.print("    Wert Lichtschranke 2 = ");
+    Serial.print(value_light_barrier_2);
+            
+   }
+
+
+// ===========================
+// =======    LOOP   =========
+// ===========================
+
+void loop()
+   {
+    while(digitalRead(buttonPin))     // reads the potentiometer for entering the mass of the oil until button is pressed
+       {
+        sensorValue = analogRead(PotiPin);    // reads the input-voltage of the potentiometer
+
+        mass_oil = 30.0 + sensorValue * 30.0 / 1023;   // with the potentiometer the mass of the oil can be adjusted between 30g and 60g
+
+        density_oil = mass_oil / volume_oil;           // calculates the density of the used oil
+
+        lcd.setCursor(0,0);
+        lcd.print("m_oil = ");
+        lcd.print(mass_oil,1);
+        lcd.print(" g     ");
+        lcd.setCursor(0,1);
+        lcd.print("if ok button...   ");
+
+        delay(50);
+    
+       }
+
+    lcd.setCursor(0,0);
+    lcd.print("waiting for the ");
+    lcd.setCursor(0,1);
+    lcd.print("sphere...       ");
+
+    while(analogRead(light_barrier_1) > 0.95 * value_light_barrier_1)    
+       {
+        // waiting for the sphere passing lightbarrier 1
+       }
+ 
+    time_start = millis();
+
+    lcd.setCursor(0,0);
+    lcd.print("t_start = ");
+    lcd.print(time_start/1000.0, 2);
+    lcd.print("    ");
+    lcd.setCursor(0,1);
+    lcd.print("                ");
+      
+    
+    while(analogRead(light_barrier_2) > 0.95 * value_light_barrier_2)    
+       {
+        // waiting for the sphere passing lightbarrier 2
+       }
+ 
+    time_end = millis();
+
+    lcd.setCursor(0,1);
+    lcd.print("t_end = ");
+    lcd.print(time_end/1000.0, 2);
+    lcd.print("    ");
+
+    delay(4000);
+    
+    velocity = distance / ((time_end - time_start) / 1000.0);      // calculates the velocity of the sphere in cm/s
+
+
+    // Calculation of the viscosity
+    // ============================
+
+    viscosity = 10.0 * g *(mass_sphere - (density_oil * 4.0 * Pi * radius_sphere * radius_sphere * radius_sphere / 3.0)) / (6.0 * Pi * radius_sphere * velocity);
+
+    lcd.setCursor(0,0);
+    lcd.print("eta = ");
+    lcd.print(viscosity,3);
+    lcd.print("     ");
+    lcd.setCursor(0,1);
+    lcd.print("button: go on... ");
+
+    while(digitalRead(buttonPin))     // waiting for button pressed for a new measurement 
+       {
+        delay(20);
+       }
+
+    delay(1000);
+    
+
